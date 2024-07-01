@@ -1,20 +1,62 @@
 framework:
     cache:
-        # Unique name of your app: used to compute stable namespaces for cache keys.
-        #prefix_seed: your_vendor_name/app_name
+        app: app.cache.pool
+        system: cache.adapter.array
+        default_redis_provider: '%env(REDIS_URL)%'
+        pools:
+            app.cache.pool:
+                adapters:
+                    - cache.array.pool
+                    - app.cache.redis.pool
 
-        # The "app" cache stores to the filesystem by default.
-        # The data in this cache should persist between deploys.
-        # Other options include:
+            app.cache.redis.pool:
+                adapter: app.cache.adapter.redis
+                provider: cache.provider.redis.pool
+                default_lifetime: '%default_array_cache_ttl%'
 
-        # Redis
-        #app: cache.adapter.redis
-        #default_redis_provider: redis://localhost
+            cache.array.pool:
+                adapter: app.cache.adapter.array
 
-        # APCu (not recommended with heavy random-write workloads as memory fragmentation can cause perf issues)
-        #app: cache.adapter.apcu
+            # used directly from services.yaml
+            http.cache.redis.pool:
+                adapter: http.cache.adapter.redis
+                provider: cache.provider.redis.pool
+                default_lifetime: '%default_http_cache_ttl%'
+parameters:
+    default_array_cache_ttl: 30
+    default_http_cache_ttl: 1200
+    redis.dsn: '%env(REDIS_URL)%'
+    redis.namespace: '%env(REDIS_NAMESPACE_PREFIX)%'
 
-        # Namespaced pools use the above "app" backend by default
-        #pools:
-            #my.dedicated.cache: null
+services:
+    _defaults:
+        autowire: true      # Automatically injects dependencies in your services.
+        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
 
+    cache.provider.redis.pool:
+        class: Redis
+        public: true
+        factory: ['Symfony\Component\Cache\Adapter\RedisAdapter', 'createConnection']
+        arguments:
+            $dsn: '%redis.dsn%'
+
+    app.cache.adapter.redis:
+        parent: cache.adapter.redis
+        arguments:
+            $namespace: '%redis.namespace%'
+
+    http.cache.adapter.redis:
+        parent: cache.adapter.redis
+        arguments:
+            $namespace: '%redis.namespace%_http_cache'
+
+    app.cache.factory.array:
+        class: App\Infrastructure\Cache\Array\ArrayAdapterFactory
+        arguments:
+            $maxItems: 100000
+            $maxLifetime: '%default_array_cache_ttl%'
+
+    app.cache.adapter.array:
+        class: Symfony\Component\Cache\Adapter\ArrayAdapter
+        factory: [ '@app.cache.factory.array', 'create' ]
+        arguments: [ '%redis.namespace%' ]
