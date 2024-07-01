@@ -1,0 +1,12 @@
+framework:
+    lock: '%env(REDIS_URL)%'
+
+services:
+    Symfony\Component\Lock\Store\RedisStore:
+        arguments:
+            - '@cache.provider.redis.pool'
+
+    Symfony\Component\Lock\LockFactory:
+        public: true
+        arguments:
+            - '@Symfony\Component\Lock\Store\RedisStore'
