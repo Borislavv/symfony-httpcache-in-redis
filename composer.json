@@ -8,7 +8,6 @@
         "ext-ctype": "*",
         "ext-iconv": "*",
         "ext-redis": "*",
-        "symfony/console": "6.4.*",
         "symfony/dotenv": "6.4.*",
         "symfony/flex": "^2",
         "symfony/framework-bundle": "6.4.*",
@@ -16,8 +15,18 @@
         "symfony/yaml": "6.4.*",
         "psr/log": "^3.0",
         "symfony/lock": "7.*",
+        "symfony/console": "7.*",
         "symfony/monolog-bundle": "^3.10",
         "toflar/psr6-symfony-http-cache-store": "^4.2"
+    },
+    "extra": {
+        "runtime": {
+            "class": "App\\Infrastructure\\Runtime\\Runtime"
+        },
+        "symfony": {
+            "allow-contrib": false,
+            "require": "6.4.*"
+        }
     },
     "require-dev": {
     },
@@ -62,11 +71,5 @@
     },
     "conflict": {
         "symfony/symfony": "*"
-    },
-    "extra": {
-        "symfony": {
-            "allow-contrib": false,
-            "require": "6.4.*"
-        }
     }
 }
