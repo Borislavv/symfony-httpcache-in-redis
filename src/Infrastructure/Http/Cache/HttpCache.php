@@ -2,9 +2,6 @@
 
 namespace App\Infrastructure\Http\Cache;
 
-use Exception;
-use Redis;
-use RedisException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\HttpCache\HttpCache as SymfonyHttpCache;
@@ -12,16 +9,16 @@ use Symfony\Component\HttpKernel\HttpCache\ResponseCacheStrategyInterface;
 use Symfony\Component\HttpKernel\HttpCache\StoreInterface;
 use Symfony\Component\HttpKernel\HttpCache\SurrogateInterface;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\HttpKernel\TerminableInterface;
 
 class HttpCache extends SymfonyHttpCache implements HttpCacheInterface
 {
     private Request $request;
+    private array $traces = [];
     protected ResponseCacheStrategyInterface|null $surrogateCacheStrategy = null;
 
-    protected array $traces = [];
-
     public function __construct(
-        private readonly Redis $redis,
+        private readonly \Redis $redis,
         HttpKernelInterface $kernel,
         StoreInterface $store,
         protected SurrogateInterface|null $surrogate = null,
@@ -43,7 +40,7 @@ class HttpCache extends SymfonyHttpCache implements HttpCacheInterface
         if (!isset($options['trace_level'])) {
             $this->options['trace_level'] = $this->options['debug'] ? 'full' : 'none';
         }
-        
+
         parent::__construct($kernel, $store, $surrogate, $options);
     }
 
@@ -51,7 +48,6 @@ class HttpCache extends SymfonyHttpCache implements HttpCacheInterface
     {
         // FIXME: catch exceptions and implement a 500 error page here? -> in Varnish, there is a built-in error page mechanism
         if (HttpKernelInterface::MAIN_REQUEST === $type) {
-            $this->traces = [];
             // Keep a clone of the original request for surrogates so they can access it.
             // We must clone here to get a separate instance because the application will modify the request during
             // the application flow (we know it always does because we do ourselves by setting REMOTE_ADDR to 127.0.0.1
@@ -100,9 +96,45 @@ class HttpCache extends SymfonyHttpCache implements HttpCacheInterface
         return $response;
     }
 
+    public function terminate(Request $request, Response $response): void
+    {
+        // Do not call any listeners in case of a cache hit.
+        // This ensures identical behavior as if you had a separate
+        // reverse caching proxy such as Varnish and the like.
+        if ($this->options['terminate_on_cache_hit']) {
+            trigger_deprecation('symfony/http-kernel', '6.2', 'Setting "terminate_on_cache_hit" to "true" is deprecated and will be changed to "false" in Symfony 7.0.');
+        } elseif (\in_array('fresh', $this->traces[$this->getTraceKey($request)] ?? [], true)) {
+            return;
+        }
+
+        if ($this->getKernel() instanceof TerminableInterface) {
+            $this->getKernel()->terminate($request, $response);
+        }
+    }
+
+    public function getRequest(): Request
+    {
+        return $this->request;
+    }
+
+    public function getLog(): string
+    {
+        $log = [];
+        foreach ($this->traces as $request => $traces) {
+            $log[] = sprintf('%s: %s', $request, implode(', ', $traces));
+        }
+
+        return implode('; ', $log);
+    }
+
+    private function record(Request $request, string $event)
+    {
+        $this->traces[$this->getTraceKey($request)][] = $event;
+    }
+
     /**
-     * @throws Exception
-     * @throws RedisException
+     * @throws \Exception
+     * @throws \RedisException
      */
     private function restoreResponseBody(Request $request, Response $response)
     {
@@ -146,11 +178,6 @@ class HttpCache extends SymfonyHttpCache implements HttpCacheInterface
         $response->headers->remove('X-Body-File');
     }
 
-    private function record(Request $request, string $event)
-    {
-        $this->traces[$this->getTraceKey($request)][] = $event;
-    }
-
     private function getTraceKey(Request $request): string
     {
         $path = $request->getPathInfo();
@@ -176,5 +203,10 @@ class HttpCache extends SymfonyHttpCache implements HttpCacheInterface
         if (null !== $traceString) {
             $response->headers->add([$this->options['trace_header'] => $traceString]);
         }
+    }
+
+    public function getTraces(): array
+    {
+        return $this->traces;
     }
 }
