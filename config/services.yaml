@@ -22,3 +22,19 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    App\Infrastructure\Http\Cache\HttpCacheInterface:
+        class: App\Infrastructure\Http\Cache\HttpCache
+        public: true
+        arguments:
+            $redis: '@cache.provider.redis.pool'
+            $store: '@App\Infrastructure\Http\Cache\Store\RedisStoreInterface'
+
+    App\Infrastructure\Http\Cache\Store\RedisStoreInterface:
+        class: App\Infrastructure\Http\Cache\Store\RedisStore
+        public: true
+        arguments:
+            $redis: '@http.cache.redis.pool'
+            $cacheDir: '%kernel.cache_dir%/%kernel.environment%/http_cache'
+            $lockFactory: '@Symfony\Component\Lock\LockFactory'
+            $store: '@Symfony\Component\Lock\Store\RedisStore'
