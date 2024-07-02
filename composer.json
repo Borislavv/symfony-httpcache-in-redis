@@ -14,14 +14,14 @@
         "symfony/runtime": "6.4.*",
         "symfony/yaml": "6.4.*",
         "psr/log": "^3.0",
-        "symfony/lock": "7.*",
-        "symfony/console": "7.*",
+        "symfony/lock": "*",
+        "symfony/console": "*",
         "symfony/monolog-bundle": "^3.10",
         "toflar/psr6-symfony-http-cache-store": "^4.2"
     },
     "extra": {
         "runtime": {
-            "class": "App\\Infrastructure\\Runtime\\Runtime"
+            "class": "App\\Infrastructure\\Runtime\\CustomHttpCacheRuntime"
         },
         "symfony": {
             "allow-contrib": false,
