@@ -38,3 +38,8 @@ services:
             $cacheDir: '%kernel.cache_dir%/%kernel.environment%/http_cache'
             $lockFactory: '@Symfony\Component\Lock\LockFactory'
             $store: '@Symfony\Component\Lock\Store\RedisStore'
+
+    exception.listener:
+        class: App\Infrastructure\EventListener\Exception\ExceptionListener
+        tags:
+            - { name: kernel.event_listener, event: kernel.exception, method: onKernelException }
